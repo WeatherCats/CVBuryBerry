@@ -1,0 +1,9 @@
+name: CVBuryBerry
+version: 1.18
+main: org.cubeville.cvburyberry.CVBuryBerry
+api-version: 1.18
+prefix: CVBuryBerry
+depend: [ CVGames, CVLoadouts ]
+authors: [ Ptown16, FrediW ]
+description: Bury Berry for Cubeville!
+website: cubeville.org
