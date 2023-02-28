@@ -34,6 +34,9 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     private int timeCounter;
     private int teamCount;
     private List<Map<String, Object>> teams;
+    private List<Integer> activeTeams = new ArrayList<>();
+
+    private List<Set<Player>> playerList;
 
     public BuryBerry(String id, String arenaName) {
         super(id, arenaName);
@@ -67,11 +70,12 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     }
 
     public int getOpposingingTeamIndex(int team) {
-        int oppTeam = team + 1;
-        if (teams.size() <= oppTeam) {
-            oppTeam = 0;
+        Integer index = activeTeams.indexOf(team);
+        int oppTeamIndex = index + 1;
+        if (activeTeams.size() <= oppTeamIndex) {
+            oppTeamIndex = 0;
         }
-        return oppTeam;
+        return activeTeams.get(oppTeamIndex);
     }
 
     // "state" is a variable that exists in every game that allows the games plugin to track which players are playing the game
@@ -87,9 +91,16 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
 
         teamCount = players.size();
         teams = (List<Map<String, Object>>) getVariable("teams");
+        playerList = players;
+
+        Bukkit.getLogger().info("" + players);
 
         for(int teamnr = 0; teamnr < teamCount; teamnr++) {
             Map<String, Object> team = teams.get(teamnr);
+
+            if (players.get(teamnr).size() > 0) {
+                activeTeams.add(teamnr);
+            }
 
             {
                 GameRegion lawn = (GameRegion) team.get("lawn");
@@ -218,7 +229,8 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
 
     private void switchToSearch() {        
         // First check who finished hiding all blocks
-        for(int teamnr = 0; teamnr < teamCount; teamnr++) {
+        for(int teamIndex = 0; teamIndex < activeTeams.size(); teamIndex++) {
+            Integer teamnr = activeTeams.get(teamIndex);
             Map<String, Object> team = teams.get(teamnr);
             Material wool = (Material) team.get("wooltype");
             GameRegion rg1 = (GameRegion) team.get("lawn");
@@ -232,7 +244,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
                 fillStore(rg3, wool, remain);
                 ChatColor chatColor = (ChatColor) team.get("chat-color");
                 String teamName = (String) team.get("name");
-                sendMessageToArena(chatColor + teamName + " Team §ffailed to hide " + remain + " wool.");
+                sendMessageToArena(chatColor + getPlayerFromTeam(teamnr).getName() + " §ffailed to hide " + remain + " wool.");
             }
             int repteamnr = getOpposingingTeamIndex(teamnr);
             Map<String, Object> repTeam = teams.get(repteamnr);
@@ -245,6 +257,9 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
         hidingGamePhase = false;
     }
 
+    private Player getPlayerFromTeam(Integer team) {
+        return playerList.get(team).iterator().next();
+    }
     @EventHandler
     public void onPlaceBlock(BlockPlaceEvent event) {
         Player player = event.getPlayer();
@@ -270,6 +285,10 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
             }
         }
         else {
+            if (!rg1.containsLocation(loc) && !rg2.containsLocation(loc) && !rg3.containsLocation(loc)) {
+                event.setBuild(false);
+                player.sendMessage(GameUtils.createColorString("&cYou may not place there."));
+            }
             if (rg3.containsLocation(loc)) {
                 List<GameRegion> blockstore = new ArrayList<>();
                 blockstore.add(rg3);
@@ -286,8 +305,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     private void endGame(int winner) {
         Map<String, Object> team = teams.get(winner);
         ChatColor color = (ChatColor) team.get("chat-color");
-        String name = (String) team.get("name");
-        title("" + color + name + " Team Won!", "", false);
+        title("" + color + getPlayerFromTeam(winner).getName() + " Won!", "", false);
         finishGame();
     }
     
@@ -306,13 +324,13 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     // This happens if finishGame() is called, or if all players leave the game
     @Override
     public void onGameFinish() {
-        if(task != -1)
-            Bukkit.getScheduler().cancelTask(task);
-        task = -1;
         for (Player player : state.keySet()) {
             player.getScoreboard().clearSlot(DisplaySlot.SIDEBAR);
             sendStatistics(player);
         }
+        if(task != -1)
+            Bukkit.getScheduler().cancelTask(task);
+        task = -1;
     }
 
     @Override
@@ -340,13 +358,13 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
         for (Integer team : sortedTeams) {
             Map<String, Object> teamData = teams.get(team);
             ChatColor color = (ChatColor) teamData.get("chat-color");
-            String name = (String) teamData.get("name");
             Integer oppTeam = getOpposingingTeamIndex(team);
+            ChatColor oppColor = (ChatColor) teams.get(oppTeam).get("chat-color");
             if (hidingGamePhase) {
-                scoreboardLines.add(color + "§l" + name + " Team: §a" + countHiddenBlocks(team) + " §fHidden");
+                scoreboardLines.add(color + getPlayerFromTeam(team).getName() +  ": §a" + countHiddenBlocks(team) + " §fHidden");
             }
             else {
-                scoreboardLines.add(color + "§l" + name + " Team: §a" + getTeamScore(team) + " §fPlaced, §a" + countHiddenBlocks(oppTeam) + " §fTo Find");
+                scoreboardLines.add(oppColor + "◎ " + color + getPlayerFromTeam(team).getName() +  ": §a" + getTeamScore(team) + " §fPlaced, §a" + countHiddenBlocks(oppTeam) + " §fTo Find");
             }
         }
         Scoreboard scoreboard = GameUtils.createScoreboard(arena, "§c§lBury Berry", scoreboardLines);
@@ -361,9 +379,9 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
         for (Integer team : sortedTeams) {
             Map<String, Object> teamData = teams.get(team);
             ChatColor color = (ChatColor) teamData.get("chat-color");
-            String name = (String) teamData.get("name");
             Integer oppTeam = getOpposingingTeamIndex(team);
-            lines.add(color + "§l" + name + " Team: §a" + getTeamScore(team) + " §fPlaced, §a" + countHiddenBlocks(oppTeam) + " §fTo Find");
+            ChatColor oppColor = (ChatColor) teams.get(oppTeam).get("chat-color");
+            lines.add(oppColor + "◎ " + color + getPlayerFromTeam(team).getName() +  ": §a" + getTeamScore(team) + " §fPlaced, §a" + countHiddenBlocks(oppTeam) + " §fTo Find");
         }
         player.sendMessage(String.join("\n", lines));
     }
@@ -398,9 +416,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
             }
         }
         return sortedTeams;*/
-        List<Integer> teamnrs = new ArrayList<>();
-        for (int i = 0; i < teams.size(); i++)
-            teamnrs.add(i);
+        List<Integer> teamnrs = new ArrayList<>(activeTeams);
         if (hidingGamePhase) {
             return teamnrs.stream().sorted(Comparator.comparingInt(this::countHiddenBlocks)).collect(Collectors.toList());
         }
