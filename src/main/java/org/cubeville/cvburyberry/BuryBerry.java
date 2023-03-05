@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.*;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.entity.Entity;
@@ -45,6 +46,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
         addGameVariable("message-portal", new GameVariableString("Portal covering entire arena"));
         addGameVariable("hiding-time", new GameVariableInt("The amount of time the players can hide their wool"), 60);
         addGameVariable("seeking-time", new GameVariableInt("The amount of time the players can search for wool"), 120);
+        addGameVariable("region-name", new GameVariableString("Name of a region covering the arena."));
 
         addGameVariableTeamsList(new HashMap<>(){{
             put("spawn", new GameVariableLocation("The spawn location for the team"));
@@ -264,7 +266,6 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     public void onPlaceBlock(BlockPlaceEvent event) {
         Player player = event.getPlayer();
         if (getState(player) == null) return;
-        BuryBerryState state = getState(player);
         Location loc = event.getBlock().getLocation();
 
         int teamnr = getPlayerTeamIndex(player);
@@ -274,7 +275,6 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
 
         int oppTeamnr = getOpposingingTeamIndex(teamnr);
         Map<String, Object> oppTeam = teams.get(oppTeamnr);
-        GameRegion oppStore = (GameRegion) oppTeam.get("blockstore");
         Material oppWool = (Material) oppTeam.get("wooltype");
         GameRegion rg3 = (GameRegion) oppTeam.get("blockstore");
 
@@ -285,7 +285,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
             }
         }
         else {
-            if (!rg1.containsLocation(loc) && !rg2.containsLocation(loc) && !rg3.containsLocation(loc)) {
+            if (!rg3.containsLocation(loc)) {
                 event.setBuild(false);
                 player.sendMessage(GameUtils.createColorString("&cYou may not place there."));
             }
@@ -298,6 +298,39 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
                 }
             }
             // Check if blockstore of opposing team and check if enough to win.
+        }
+
+    }
+    @EventHandler
+    public void onBreakBlock(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        if (getState(player) == null) return;
+        Location loc = event.getBlock().getLocation();
+
+        int teamnr = getPlayerTeamIndex(player);
+        Map<String, Object> team = teams.get(teamnr);
+        GameRegion rg1 = (GameRegion) team.get("lawn");
+        GameRegion rg2 = (GameRegion) team.get("abovelawn");
+        GameRegion rg3 = (GameRegion) team.get("blockstore");
+
+        int oppTeamnr = getOpposingingTeamIndex(teamnr);
+        Map<String, Object> oppTeam = teams.get(oppTeamnr);
+        Material oppWool = (Material) oppTeam.get("wooltype");
+        GameRegion rg6 = (GameRegion) oppTeam.get("blockstore");
+        GameRegion rg4 = (GameRegion) oppTeam.get("lawn");
+        GameRegion rg5 = (GameRegion) oppTeam.get("abovelawn");
+
+        if (hidingGamePhase) {
+            if (!rg1.containsLocation(loc) && !rg2.containsLocation(loc) && !rg3.containsLocation(loc)) {
+                event.setCancelled(true);
+                player.sendMessage(GameUtils.createColorString("&cYou may not break there."));
+            }
+        }
+        else {
+            if (!rg6.containsLocation(loc) && !rg4.containsLocation(loc) && !rg5.containsLocation(loc)) {
+                event.setCancelled(true);
+                player.sendMessage(GameUtils.createColorString("&cYou may not break there."));
+            }
         }
 
     }
@@ -328,6 +361,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
             player.getScoreboard().clearSlot(DisplaySlot.SIDEBAR);
             sendStatistics(player);
         }
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "cvtools killentities type:dropped_item wg:" + getVariable("region-name") + " world:" + ((Location) getVariable("lobby")).getWorld().getName());
         if(task != -1)
             Bukkit.getScheduler().cancelTask(task);
         task = -1;
@@ -418,10 +452,10 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
         return sortedTeams;*/
         List<Integer> teamnrs = new ArrayList<>(activeTeams);
         if (hidingGamePhase) {
-            return teamnrs.stream().sorted(Comparator.comparingInt(this::countHiddenBlocks)).collect(Collectors.toList());
+            return teamnrs.stream().sorted(Comparator.comparingInt(this::countHiddenBlocks)).distinct().collect(Collectors.toList());
         }
         else {
-            return teamnrs.stream().sorted(Comparator.comparingInt(this::getTeamScore).thenComparingInt(o -> -countHiddenBlocks(getOpposingingTeamIndex(o)))).collect(Collectors.toList());
+            return teamnrs.stream().sorted(Comparator.comparingInt(this::getTeamScore).thenComparingInt(o -> -countHiddenBlocks(getOpposingingTeamIndex(o)))).distinct().collect(Collectors.toList());
         }
     //    team.stream().sorted(Comparator.comparingInt(o -> getState(o)));
     }
