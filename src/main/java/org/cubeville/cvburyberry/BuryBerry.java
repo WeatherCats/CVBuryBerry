@@ -35,7 +35,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     private int timeCounter;
     private int teamCount;
     private List<Map<String, Object>> teams;
-    private List<Integer> activeTeams = new ArrayList<>();
+    private List<Integer> activeTeams;
 
     private List<Set<Player>> playerList;
 
@@ -94,8 +94,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
         teamCount = players.size();
         teams = (List<Map<String, Object>>) getVariable("teams");
         playerList = players;
-
-        Bukkit.getLogger().info("" + players);
+        activeTeams = new ArrayList<>();
 
         for(int teamnr = 0; teamnr < teamCount; teamnr++) {
             Map<String, Object> team = teams.get(teamnr);
@@ -260,7 +259,14 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     }
 
     private Player getPlayerFromTeam(Integer team) {
-        return playerList.get(team).iterator().next();
+        try {
+            return playerList.get(team).iterator().next();
+        }
+        catch (NoSuchElementException e) {
+            Bukkit.getLogger().warning("ERROR! Please contact WeatherCats with the log info.");
+            Bukkit.getLogger().warning("Player List: " + playerList + " Active Teams: " + activeTeams + " Sorted Teams: " + getSortedTeams());
+            throw e;
+        }
     }
     @EventHandler
     public void onPlaceBlock(BlockPlaceEvent event) {
@@ -432,24 +438,6 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     }
 
     private List<Integer> getSortedTeams() {
-        /*Map<Integer, Integer> teamScores = new HashMap<>();
-        for (int i = 0; i < teams.size(); i++) {
-            teamScores.put(i, getTeamScore(i));
-        }
-        ArrayList<Integer> list = new ArrayList<>();
-        ArrayList<Integer> sortedTeams = new ArrayList<>();
-        // This feels very, very wrong at the moment.
-        for (Map.Entry<Integer, Integer> entry : teamScores.entrySet()) {
-            list.add(entry.getValue());
-        }
-        Collections.sort(list);
-        for (int num : list) {
-            for (Map.Entry<Integer, Integer> entry : teamScores.entrySet()) {
-                if (!entry.getValue().equals(num)) continue;
-                sortedTeams.add(entry.getKey());
-            }
-        }
-        return sortedTeams;*/
         List<Integer> teamnrs = new ArrayList<>(activeTeams);
         if (hidingGamePhase) {
             return teamnrs.stream().sorted(Comparator.comparingInt(this::countHiddenBlocks)).distinct().collect(Collectors.toList());
@@ -457,6 +445,5 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
         else {
             return teamnrs.stream().sorted(Comparator.comparingInt(this::getTeamScore).thenComparingInt(o -> -countHiddenBlocks(getOpposingingTeamIndex(o)))).distinct().collect(Collectors.toList());
         }
-    //    team.stream().sorted(Comparator.comparingInt(o -> getState(o)));
     }
 }
