@@ -365,8 +365,8 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
     public void onGameFinish() {
         for (Player player : state.keySet()) {
             player.getScoreboard().clearSlot(DisplaySlot.SIDEBAR);
-            sendStatistics(player);
         }
+        sendStatistics();
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "cvtools killentities type:dropped_item wg:" + getVariable("region-name") + " world:" + ((Location) getVariable("lobby")).getWorld().getName());
         if(task != -1)
             Bukkit.getScheduler().cancelTask(task);
@@ -411,7 +411,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
         sendScoreboardToArena(scoreboard);
     }
 
-    private void sendStatistics(Player player) {
+    private void sendStatistics() {
         List<String> lines = new ArrayList<>();
         List<Integer> sortedTeams = getSortedTeams();
         Collections.reverse(sortedTeams);
@@ -423,7 +423,7 @@ public class BuryBerry extends TeamSelectorGame implements Listener {
             ChatColor oppColor = (ChatColor) teams.get(oppTeam).get("chat-color");
             lines.add(oppColor + "◎ " + color + getPlayerFromTeam(team).getName() +  ": §a" + getTeamScore(team) + " §fPlaced, §a" + countHiddenBlocks(oppTeam) + " §fTo Find");
         }
-        player.sendMessage(String.join("\n", lines));
+        sendMessageToArena(String.join("\n", lines));
     }
 
     private Integer getTeamScore(Integer team) {
